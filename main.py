@@ -111,7 +111,8 @@ class HacxBrain:
                 timeout=30.0   # Add timeout for cloud environments
             )   
         )  
-        self.model = cfg["MODEL_NAME"](self.history) = [{"role": "system", "content": self.SYSTEM_PROMPT}]  
+        self.model = cfg["MODEL_NAME"]  # Fixed: proper assignment
+        self.history = [{"role": "system", "content": self.SYSTEM_PROMPT}]  # Fixed: proper assignment
 
     def reset(self): 
         self.history = [{"role": "system", "content": self.SYSTEM_PROMPT}]  
