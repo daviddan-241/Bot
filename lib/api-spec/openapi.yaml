@@ -1,0 +1,1269 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: SiteForge AI API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+  - name: auth
+  - name: dashboard
+  - name: discovery
+  - name: leads
+  - name: scanner
+  - name: generator
+  - name: proposals
+  - name: settings
+  - name: notifications
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ── Auth ──────────────────────────────────────────────────────────────────
+  /auth/user:
+    get:
+      operationId: getCurrentAuthUser
+      tags: [auth]
+      summary: Get the currently authenticated user (Replit Auth)
+      responses:
+        "200":
+          description: Auth status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUserEnvelope"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Not authenticated
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Log out current session
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogoutSuccess"
+
+  /login:
+    get:
+      operationId: beginBrowserLogin
+      tags: [auth]
+      summary: Start browser OIDC login
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to OIDC
+
+  /callback:
+    get:
+      operationId: handleBrowserLoginCallback
+      tags: [auth]
+      summary: Complete browser OIDC login
+      responses:
+        "302":
+          description: Redirect after login
+
+  /logout:
+    get:
+      operationId: logoutBrowserSession
+      tags: [auth]
+      summary: Clear session and logout
+      responses:
+        "302":
+          description: Redirect to OIDC logout
+
+  /mobile-auth/token-exchange:
+    post:
+      operationId: exchangeMobileAuthorizationCode
+      tags: [auth]
+      summary: Exchange mobile OIDC code for session token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MobileTokenExchangeRequest"
+      responses:
+        "200":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MobileTokenExchangeSuccess"
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /mobile-auth/logout:
+    post:
+      operationId: logoutMobileSession
+      tags: [auth]
+      summary: Delete mobile session
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogoutSuccess"
+
+  # ── Dashboard ─────────────────────────────────────────────────────────────
+  /dashboard/metrics:
+    get:
+      operationId: getDashboardMetrics
+      tags: [dashboard]
+      summary: Get dashboard summary metrics
+      responses:
+        "200":
+          description: Metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardMetrics"
+
+  # ── Discovery ─────────────────────────────────────────────────────────────
+  /discovery/search:
+    post:
+      operationId: searchBusinesses
+      tags: [discovery]
+      summary: Search for businesses
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BusinessSearchInput"
+      responses:
+        "200":
+          description: List of businesses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BusinessResult"
+
+  /discovery/autoscan:
+    post:
+      operationId: autoScanArea
+      tags: [discovery]
+      summary: Auto-scan all businesses in an area
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AutoScanInput"
+      responses:
+        "200":
+          description: List of businesses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BusinessResult"
+
+  # ── AutoScan Scheduler ────────────────────────────────────────────────────
+  /autoscan/status:
+    get:
+      operationId: getAutoscanStatus
+      tags: [discovery]
+      summary: Get AutoScan scheduler status
+      responses:
+        "200":
+          description: Scheduler state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutoScanStatus"
+
+  /autoscan/trigger:
+    post:
+      operationId: triggerAutoscan
+      tags: [discovery]
+      summary: Manually trigger an AutoScan run
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManualScanRequest"
+      responses:
+        "200":
+          description: Trigger acknowledged
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, running]
+                properties:
+                  message:
+                    type: string
+                  running:
+                    type: boolean
+
+  /autoscan/cities:
+    get:
+      operationId: getAutoscanCities
+      tags: [discovery]
+      summary: Get list of cities available for scanning
+      responses:
+        "200":
+          description: City list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [city, country]
+                  properties:
+                    city:
+                      type: string
+                    country:
+                      type: string
+
+  /autoscan/categories:
+    get:
+      operationId: getAutoscanCategories
+      tags: [discovery]
+      summary: Get list of business categories for scanning
+      responses:
+        "200":
+          description: Category list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  # ── Leads / CRM ───────────────────────────────────────────────────────────
+  /leads:
+    get:
+      operationId: listLeads
+      tags: [leads]
+      summary: List leads
+      parameters:
+        - name: stage
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Leads list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadsPage"
+    post:
+      operationId: createLead
+      tags: [leads]
+      summary: Save a new lead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadInput"
+      responses:
+        "201":
+          description: Created lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+
+  /leads/{id}:
+    get:
+      operationId: getLead
+      tags: [leads]
+      summary: Get a lead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+    patch:
+      operationId: updateLead
+      tags: [leads]
+      summary: Update a lead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadUpdate"
+      responses:
+        "200":
+          description: Updated lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+    delete:
+      operationId: deleteLead
+      tags: [leads]
+      summary: Delete a lead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /leads/{id}/stage:
+    patch:
+      operationId: updateLeadStage
+      tags: [leads]
+      summary: Update CRM stage
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadStageInput"
+      responses:
+        "200":
+          description: Updated
+
+  # ── Scanner ───────────────────────────────────────────────────────────────
+  /scanner/scan:
+    post:
+      operationId: scanWebsite
+      tags: [scanner]
+      summary: Scan a website URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanInput"
+      responses:
+        "200":
+          description: Scan result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanResult"
+
+  /scanner/history:
+    get:
+      operationId: getScanHistory
+      tags: [scanner]
+      summary: Get scan history
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: History
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScanResult"
+
+  # ── Website Generator ─────────────────────────────────────────────────────
+  /generator/generate:
+    post:
+      operationId: generateWebsite
+      tags: [generator]
+      summary: Generate website content with AI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateWebsiteInput"
+      responses:
+        "200":
+          description: Generated website
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratedWebsite"
+
+  /generator/preview/{id}:
+    get:
+      operationId: getWebsitePreview
+      tags: [generator]
+      summary: Get generated website HTML preview
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: HTML preview
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /generator/list:
+    get:
+      operationId: listGeneratedWebsites
+      tags: [generator]
+      summary: List generated websites
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GeneratedWebsite"
+
+  # ── Proposals ─────────────────────────────────────────────────────────────
+  /proposals:
+    get:
+      operationId: listProposals
+      tags: [proposals]
+      summary: List proposals
+      responses:
+        "200":
+          description: Proposals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Proposal"
+    post:
+      operationId: createProposal
+      tags: [proposals]
+      summary: Generate AI proposal for a lead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProposalInput"
+      responses:
+        "201":
+          description: Created proposal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proposal"
+
+  /proposals/{id}:
+    get:
+      operationId: getProposal
+      tags: [proposals]
+      summary: Get a proposal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Proposal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proposal"
+    patch:
+      operationId: updateProposal
+      tags: [proposals]
+      summary: Update proposal status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProposalUpdate"
+      responses:
+        "200":
+          description: Updated proposal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proposal"
+
+  /proposals/public/{token}:
+    get:
+      operationId: getPublicProposal
+      tags: [proposals]
+      summary: Get public proposal by share token
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Proposal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proposal"
+
+  # ── Settings ──────────────────────────────────────────────────────────────
+  /settings/profile:
+    get:
+      operationId: getProfile
+      tags: [settings]
+      summary: Get user profile
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+    patch:
+      operationId: updateProfile
+      tags: [settings]
+      summary: Update user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserProfileUpdate"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /settings/api-keys:
+    get:
+      operationId: getApiKeys
+      tags: [settings]
+      summary: Get saved API keys (masked)
+      responses:
+        "200":
+          description: API keys
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeys"
+    patch:
+      operationId: updateApiKeys
+      tags: [settings]
+      summary: Update API keys
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiKeysInput"
+      responses:
+        "200":
+          description: Updated
+
+  # ── Notifications ─────────────────────────────────────────────────────────
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/{id}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Marked
+
+  /notifications/read-all:
+    patch:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications read
+      responses:
+        "200":
+          description: Marked
+
+  /notifications/unread-count:
+    get:
+      operationId: getUnreadCount
+      tags: [notifications]
+      summary: Get unread notification count
+      responses:
+        "200":
+          description: Count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnreadCount"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    AuthUser:
+      type: object
+      required: [id, email, firstName, lastName, profileImageUrl]
+      properties:
+        id:
+          type: string
+        email:
+          type: ["string", "null"]
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        profileImageUrl:
+          type: ["string", "null"]
+
+    AuthUserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user:
+          oneOf:
+            - $ref: "#/components/schemas/AuthUser"
+            - type: "null"
+
+    MobileTokenExchangeRequest:
+      type: object
+      required: [code, code_verifier, redirect_uri, state]
+      properties:
+        code:
+          type: string
+          minLength: 1
+        code_verifier:
+          type: string
+          minLength: 1
+        redirect_uri:
+          type: string
+          minLength: 1
+        state:
+          type: string
+          minLength: 1
+        nonce:
+          type: string
+
+    MobileTokenExchangeSuccess:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+
+    LogoutSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    User:
+      type: object
+      required: [id, openId]
+      properties:
+        id:
+          type: integer
+        openId:
+          type: string
+        name:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        role:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+
+    DashboardMetrics:
+      type: object
+      required: [leadsFound, proposalsGenerated, clientsWon, conversionRate, recentLeads, recentProposals]
+      properties:
+        leadsFound:
+          type: integer
+        proposalsGenerated:
+          type: integer
+        clientsWon:
+          type: integer
+        conversionRate:
+          type: number
+        recentLeads:
+          type: array
+          items:
+            $ref: "#/components/schemas/Lead"
+        recentProposals:
+          type: array
+          items:
+            $ref: "#/components/schemas/Proposal"
+
+    BusinessSearchInput:
+      type: object
+      required: [query, city]
+      properties:
+        query:
+          type: string
+        city:
+          type: string
+        country:
+          type: string
+        hasWebsite:
+          type: ["boolean", "null"]
+
+    AutoScanInput:
+      type: object
+      required: [city]
+      properties:
+        city:
+          type: string
+        country:
+          type: string
+        categories:
+          type: array
+          items:
+            type: string
+
+    BusinessResult:
+      type: object
+      required: [businessName, businessType, city, hasWebsite, leadScore]
+      properties:
+        businessName:
+          type: string
+        businessType:
+          type: string
+        address:
+          type: ["string", "null"]
+        city:
+          type: string
+        country:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        hasWebsite:
+          type: boolean
+        leadScore:
+          type: integer
+        placeId:
+          type: ["string", "null"]
+        googleMapsUrl:
+          type: ["string", "null"]
+        instagramUrl:
+          type: ["string", "null"]
+        facebookUrl:
+          type: ["string", "null"]
+        whatsappNumber:
+          type: ["string", "null"]
+        whatsappUrl:
+          type: ["string", "null"]
+        whatsappMessage:
+          type: ["string", "null"]
+        lat:
+          type: ["number", "null"]
+        lon:
+          type: ["number", "null"]
+
+    ManualScanRequest:
+      type: object
+      properties:
+        city:
+          type: string
+        country:
+          type: string
+        categories:
+          type: array
+          items:
+            type: string
+
+    AutoScanStatus:
+      type: object
+      required: [isRunning, leadsFound, leadsCreated, citiesScanned, totalCities, totalCategories]
+      properties:
+        isRunning:
+          type: boolean
+        lastRun:
+          type: ["string", "null"]
+        nextRun:
+          type: ["string", "null"]
+        currentCity:
+          type: ["string", "null"]
+        currentCategory:
+          type: ["string", "null"]
+        leadsFound:
+          type: integer
+        leadsCreated:
+          type: integer
+        citiesScanned:
+          type: integer
+        totalCities:
+          type: integer
+        totalCategories:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+        cityIndex:
+          type: integer
+        categoryIndex:
+          type: integer
+
+    Lead:
+      type: object
+      required: [id, businessName, hasWebsite, crmStage, createdAt]
+      properties:
+        id:
+          type: integer
+        businessName:
+          type: string
+        businessType:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        country:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        hasWebsite:
+          type: boolean
+        leadScore:
+          type: ["integer", "null"]
+        crmStage:
+          type: string
+        notes:
+          type: ["string", "null"]
+        placeId:
+          type: ["string", "null"]
+        googleMapsUrl:
+          type: ["string", "null"]
+        whatsappNumber:
+          type: ["string", "null"]
+        instagramUrl:
+          type: ["string", "null"]
+        facebookUrl:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    LeadInput:
+      type: object
+      required: [businessName]
+      properties:
+        businessName:
+          type: string
+        businessType:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        country:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        website:
+          type: string
+        hasWebsite:
+          type: boolean
+        leadScore:
+          type: integer
+        placeId:
+          type: string
+        googleMapsUrl:
+          type: string
+        whatsappNumber:
+          type: string
+        instagramUrl:
+          type: string
+        facebookUrl:
+          type: string
+
+    LeadUpdate:
+      type: object
+      properties:
+        notes:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        whatsappNumber:
+          type: string
+        instagramUrl:
+          type: string
+        facebookUrl:
+          type: string
+
+    LeadStageInput:
+      type: object
+      required: [stage]
+      properties:
+        stage:
+          type: string
+
+    LeadsPage:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Lead"
+        total:
+          type: integer
+
+    ScanInput:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+
+    ScanResult:
+      type: object
+      required: [id, url, opportunityScore, createdAt]
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        status:
+          type: string
+        sslScore:
+          type: ["integer", "null"]
+        mobileScore:
+          type: ["integer", "null"]
+        seoScore:
+          type: ["integer", "null"]
+        performanceScore:
+          type: ["integer", "null"]
+        accessibilityScore:
+          type: ["integer", "null"]
+        opportunityScore:
+          type: ["integer", "null"]
+        sslDetails:
+          type: ["object", "null"]
+          additionalProperties: true
+        mobileDetails:
+          type: ["object", "null"]
+          additionalProperties: true
+        seoDetails:
+          type: ["object", "null"]
+          additionalProperties: true
+        performanceDetails:
+          type: ["object", "null"]
+          additionalProperties: true
+        accessibilityDetails:
+          type: ["object", "null"]
+          additionalProperties: true
+        createdAt:
+          type: string
+
+    GenerateWebsiteInput:
+      type: object
+      required: [businessName]
+      properties:
+        businessName:
+          type: string
+        businessType:
+          type: string
+        city:
+          type: string
+        description:
+          type: string
+        leadId:
+          type: ["integer", "null"]
+
+    GeneratedWebsite:
+      type: object
+      required: [id, businessName, status, createdAt]
+      properties:
+        id:
+          type: integer
+        businessName:
+          type: string
+        businessType:
+          type: ["string", "null"]
+        status:
+          type: string
+        pages:
+          type: ["object", "null"]
+          additionalProperties: true
+        htmlPreview:
+          type: ["string", "null"]
+        publicUrl:
+          type: ["string", "null"]
+        leadId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+
+    ProposalInput:
+      type: object
+      required: [leadId]
+      properties:
+        leadId:
+          type: integer
+        pricingOneTime:
+          type: number
+        pricingMonthly:
+          type: number
+
+    ProposalUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+        pricingOneTime:
+          type: number
+        pricingMonthly:
+          type: number
+
+    Proposal:
+      type: object
+      required: [id, status, createdAt]
+      properties:
+        id:
+          type: integer
+        leadId:
+          type: ["integer", "null"]
+        title:
+          type: ["string", "null"]
+        status:
+          type: string
+        pricingOneTime:
+          type: ["number", "null"]
+        pricingMonthly:
+          type: ["number", "null"]
+        shareToken:
+          type: ["string", "null"]
+        viewCount:
+          type: integer
+        content:
+          type: ["object", "null"]
+          additionalProperties: true
+        htmlPdf:
+          type: ["string", "null"]
+        businessName:
+          type: ["string", "null"]
+        businessWebsite:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    UserProfile:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        name:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        profileImageUrl:
+          type: ["string", "null"]
+        agencyName:
+          type: ["string", "null"]
+        agencyWebsite:
+          type: ["string", "null"]
+        agencyPhone:
+          type: ["string", "null"]
+        whatsappNumber:
+          type: ["string", "null"]
+        timezone:
+          type: ["string", "null"]
+
+    UserProfileUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        agencyName:
+          type: string
+        agencyWebsite:
+          type: string
+        agencyPhone:
+          type: string
+        whatsappNumber:
+          type: string
+        timezone:
+          type: string
+
+    ApiKeys:
+      type: object
+      properties:
+        hasGoogleApiKey:
+          type: boolean
+        hasSerpApiKey:
+          type: boolean
+        googleApiKeyMasked:
+          type: ["string", "null"]
+        serpApiKeyMasked:
+          type: ["string", "null"]
+
+    ApiKeysInput:
+      type: object
+      properties:
+        googleApiKey:
+          type: string
+        serpApiKey:
+          type: string
+
+    Notification:
+      type: object
+      required: [id, title, message, isRead, createdAt]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+
+    UnreadCount:
+      type: object
+      required: [count]
+      properties:
+        count:
+          type: integer
